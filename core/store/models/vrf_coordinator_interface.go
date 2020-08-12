@@ -9,7 +9,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/assets"
 	"github.com/smartcontractkit/chainlink/core/internal/gethwrappers/generated/solidity_vrf_coordinator_interface"
-	"github.com/smartcontractkit/chainlink/core/utils"
 )
 
 // RawRandomnessRequestLog is used to parse a RandomnessRequest log into types
@@ -19,12 +18,13 @@ type RawRandomnessRequestLog solidity_vrf_coordinator_interface.VRFCoordinatorRa
 // RandomnessRequestLog contains the data for a RandomnessRequest log,
 // represented as compatible golang types.
 type RandomnessRequestLog struct {
-	KeyHash common.Hash
-	Seed    *big.Int // uint256
-	JobID   common.Hash
-	Sender  common.Address
-	Fee     *assets.Link // uint256
-	Raw     RawRandomnessRequestLog
+	KeyHash   common.Hash
+	Seed      *big.Int // uint256
+	JobID     common.Hash
+	Sender    common.Address
+	Fee       *assets.Link // uint256
+	RequestID common.Hash
+	Raw       RawRandomnessRequestLog
 }
 
 var dummyCoordinator, _ = solidity_vrf_coordinator_interface.NewVRFCoordinator(
@@ -61,7 +61,7 @@ func ParseRandomnessRequestLog(log Log) (*RandomnessRequestLog, error) {
 // This serialization does not include the JobID, because that's an indexed field.
 func (l *RandomnessRequestLog) RawData() ([]byte, error) {
 	return randomnessRequestRawDataArgs().Pack(l.KeyHash,
-		l.Seed, l.Sender, (*big.Int)(l.Fee))
+		l.Seed, l.Sender, (*big.Int)(l.Fee), l.RequestID)
 }
 
 // Equal(ol) is true iff l is the same log as ol, and both represent valid
@@ -69,14 +69,6 @@ func (l *RandomnessRequestLog) RawData() ([]byte, error) {
 func (l *RandomnessRequestLog) Equal(ol RandomnessRequestLog) bool {
 	return l.KeyHash == ol.KeyHash && equal(l.Seed, ol.Seed) &&
 		l.JobID == ol.JobID && l.Sender == ol.Sender && l.Fee.Cmp(ol.Fee) == 0
-}
-
-func (l *RandomnessRequestLog) RequestID() common.Hash {
-	soliditySeed, err := utils.Uint256ToBytes(l.Seed)
-	if err != nil {
-		panic(errors.Wrapf(err, "vrf seed out of bounds in %#+v", l))
-	}
-	return utils.MustHash(string(append(l.KeyHash[:], soliditySeed...)))
 }
 
 func RawRandomnessRequestLogToRandomnessRequestLog(
